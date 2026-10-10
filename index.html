@@ -4,70 +4,50 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>AlertLens — AML alert triage copilot</title>
-<meta name="description" content="AlertLens ranks AML transaction-monitoring alerts by escalation risk, explains every score and drafts the case memo. Partner product for a bank's financial monitoring unit.">
+<meta name="description" content="AlertLens ranks AML transaction-monitoring alerts by escalation risk, explains every score and drafts the case memo. Partner product for a bank's Financial Monitoring unit.">
 <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/assets/style.css">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 </head>
 <body>
-<header class="top">
-  <div class="brand">
-    <div class="logo" aria-hidden="true"><svg viewBox="0 0 32 32" width="30" height="30"><circle cx="14" cy="14" r="9" fill="none" stroke="currentColor" stroke-width="3"/><path d="M21 21l7 7" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><path d="M9 16l3-4 3 3 3-5" fill="none" stroke="var(--accent)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-    <div><div class="name">AlertLens</div><div class="tag">AML alert triage copilot · partner product for a bank's Financial Monitoring unit</div></div>
+<div class="app">
+  <aside class="side">
+    <div class="brand">
+      <svg viewBox="0 0 32 32" width="34" height="34" aria-hidden="true"><rect width="32" height="32" rx="9" fill="#0ea5a0"/><circle cx="14" cy="14" r="7.5" fill="none" stroke="#fff" stroke-width="2.6"/><path d="M19.5 19.5l6 6" stroke="#fff" stroke-width="2.8" stroke-linecap="round"/><path d="M10 15.5l2.6-3.3 2.5 2.4 2.6-4" fill="none" stroke="#0b1b33" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <div><div class="name">AlertLens</div><div class="sub">AML alert triage copilot</div></div>
+    </div>
+    <nav class="nav" id="nav">
+      <button data-page="queue" class="active"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h10M4 18h6"/></svg>Alert queue</button>
+      <button data-page="try"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v4M12 17v4M3 12h4M17 12h4"/><circle cx="12" cy="12" r="4"/></svg>Score your own</button>
+      <button data-page="how"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.7.3-1 .9-1 1.7M12 17h.01"/></svg>How it works</button>
+      <button data-page="model"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>Model card</button>
+      <button data-page="roi"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 6H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>Budget &amp; ROI</button>
+      <button data-page="audit"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>Audit log</button>
+    </nav>
+    <div class="foot"><b>Partner product</b> for a bank's Financial Monitoring unit (pilot target: MKBANK).<br>Model alertlens-1.0 · runs without any external API.<br>Team WWWPRO · WIUT Hackathon 2026</div>
+  </aside>
+  <div class="main">
+    <header class="topbar">
+      <div><h1 id="title">Alert queue</h1><div class="sub" id="subtitle"></div></div>
+      <div class="right">
+        <span class="pill demo" title="Demo alerts are generated from aggregate statistics; all quality numbers come from a real held-out test set">● Demo: synthetic alerts · real test metrics</span>
+        <span class="pill user"><span class="avatar">O</span><span id="officer-name">officer.demo</span></span>
+      </div>
+    </header>
+    <div class="content">
+      <section class="page active" id="page-queue"></section>
+      <section class="page" id="page-detail"></section>
+      <section class="page" id="page-try"></section>
+      <section class="page" id="page-how"></section>
+      <section class="page" id="page-model"></section>
+      <section class="page" id="page-roi"></section>
+      <section class="page" id="page-audit"></section>
+    </div>
   </div>
-  <nav class="tabs" role="tablist">
-    <button data-tab="queue" class="active">Queue</button>
-    <button data-tab="try">Try it</button>
-    <button data-tab="model">Model card</button>
-    <button data-tab="roi">ROI</button>
-    <button data-tab="audit">Audit log</button>
-  </nav>
-</header>
-<div class="notice">Demo alerts are <b>synthetic</b> (generated from aggregate statistics, no real customer data). Every quality number comes from a <b>real held-out test set of 2,800 alerts</b>. The officer always makes the decision.</div>
-<main>
-  <section id="tab-queue" class="tab active">
-    <div class="kpis" id="kpis"></div>
-    <div class="toolbar">
-      <div class="seg" id="order-seg"><button data-order="risk" class="active">Order by AlertLens risk</button><button data-order="fifo">Order by arrival (today's FIFO)</button></div>
-      <div class="muted small" id="queue-note"></div>
-    </div>
-    <div id="queue" class="queue"></div>
-  </section>
-
-  <section id="tab-detail" class="tab">
-    <button class="back" id="back">← Back</button>
-    <div id="detail"></div>
-  </section>
-
-  <section id="tab-try" class="tab">
-    <h2>Score an alert the jury chooses</h2>
-    <p class="muted">Three ways: generate a synthetic client with the properties you pick, upload or paste transactions as CSV, or open any alert in the queue and edit it with the what-if buttons.</p>
-    <div class="grid2">
-      <div class="card">
-        <h3>1 · Generate a client</h3>
-        <label>Hidden typology <select id="g-typ"><option value="">random (population mix)</option><option value="S">S — high-risk markers</option><option value="N">N — low-risk markers</option><option value="none">no markers</option></select></label>
-        <label>Pre-alert burst (transactions in last 200 s): <b id="g-burst-v">40</b><input id="g-burst" type="range" min="0" max="150" value="40"></label>
-        <label>History size (transactions in 180 days): <b id="g-n-v">450</b><input id="g-n" type="range" min="20" max="2000" step="10" value="450"></label>
-        <label>Amount level shift (SD): <b id="g-shift-v">0.0</b><input id="g-shift" type="range" min="-1.5" max="1.5" step="0.1" value="0"></label>
-        <label>Seed <input id="g-seed" type="number" value="42"></label>
-        <button class="primary" id="g-go">Generate &amp; score</button>
-      </div>
-      <div class="card">
-        <h3>2 · Upload or paste CSV</h3>
-        <p class="small muted">Columns: <code>time,direction,type,amount_index</code> — direction <code>in|out</code>, type <code>bank|card|cash|intl</code>, amount_index = normalised log-amount (same scale as the bank feed). Optional first line <code>#alert_time=2026-05-10T00:00:00</code>.</p>
-        <input type="file" id="u-file" accept=".csv,text/csv">
-        <textarea id="u-text" rows="8" spellcheck="false" placeholder="time,direction,type,amount_index&#10;2026-05-01T10:00:00,in,bank,0.42&#10;2026-05-02T11:30:00,out,card,-0.31"></textarea>
-        <div class="row"><button class="primary" id="u-go">Score CSV</button><a class="btn" id="u-template" href="#">Download template</a></div>
-        <div id="u-err" class="err"></div>
-      </div>
-    </div>
-  </section>
-
-  <section id="tab-model" class="tab"><div id="model"></div></section>
-  <section id="tab-roi" class="tab"><div id="roi"></div></section>
-  <section id="tab-audit" class="tab"><div id="audit"></div></section>
-</main>
-<footer>AlertLens · WIUT Hackathon 2026 Final · team WWWPRO · <a href="https://github.com/" id="repo-link">source &amp; README</a></footer>
+</div>
+<div class="toast" id="toast"></div>
 <script src="/assets/app.js"></script>
 </body>
 </html>
