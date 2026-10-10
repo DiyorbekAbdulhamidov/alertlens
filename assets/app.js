@@ -13,7 +13,7 @@ const PAGES = {
   detail: ['Alert review', 'Why this alert got its score, and what to do next.'],
   try: ['Score your own', 'Jury mode: give us any client and we score it live.'],
   how: ['How it works', 'From raw transactions to a ranked, explained queue.'],
-  model: ['Model card', 'Measured on 2,800 real alerts the model never saw.'],
+  model: ['Model card', 'Measured on 2,800 held-out competition alerts the model never saw.'],
   roi: ['Budget & ROI', 'What a 3-month pilot costs and what it returns.'],
   audit: ['Audit log', 'Every decision, chained and tamper-evident.']
 };
@@ -138,16 +138,16 @@ async function renderQueue() {
   el.innerHTML = `
   <div class="hero" id="t-hero">
     <div><h2>${QUEUE.length} alerts are waiting. Start with the ${p1} in P1.</h2>
-      <p>AlertLens ranks every alert by how likely it is to be escalated, explains why, and drafts the case memo. On real held-out data the top 20% of the queue holds ${cap}% of all escalations.</p></div>
+      <p>AlertLens ranks every alert by how likely it is to be escalated, explains why, and drafts the case memo. On 2,800 held-out test alerts, the top 20% of the queue holds ${cap}% of all escalations.</p></div>
     <div class="row"><button class="btn white" id="tour-btn">${ICON.play} 60-second tour</button><button class="btn wline" id="top-btn">Open top alert →</button></div>
   </div>
   <div class="grid g4" style="margin-bottom:16px">
     <div class="kpi"><div class="v">${QUEUE.length}</div><div class="l">alerts waiting (synthetic demo queue)</div></div>
     <div class="kpi"><div class="v red">${p1}</div><div class="l">P1: review today. ${pct(br.P1 ? br.P1.rate : 0)} of P1 alerts were escalated in the test set</div></div>
-    <div class="kpi"><div class="v teal">${cap}%</div><div class="l">of real escalations are in the top 20% of the queue (arrival order: 20%)</div></div>
-    <div class="kpi"><div class="v teal">−${pct(wait)}</div><div class="l">average waiting time of a real escalation vs. arrival order</div></div>
+    <div class="kpi"><div class="v teal">${cap}%</div><div class="l">of escalations are in the top 20% of the queue (arrival order: 20%) · held-out test</div></div>
+    <div class="kpi"><div class="v teal">−${pct(wait)}</div><div class="l">average waiting time of an escalation vs. arrival order · held-out test</div></div>
   </div>
-  <div class="card" id="t-why"><h3>Why the order matters</h3><p class="hint">Out of 100 alerts that really needed escalation, how many does an officer reach after reviewing the first 20% of the queue? Measured on ${m.test_set.n_alerts.toLocaleString()} real alerts the model never saw.</p>
+  <div class="card" id="t-why"><h3>Why the order matters</h3><p class="hint">Out of 100 alerts that really needed escalation, how many does an officer reach after reviewing the first 20% of the queue? Measured on ${m.test_set.n_alerts.toLocaleString()} held-out test alerts the model never saw.</p>
     <div class="arrays">
       <div class="arr"><h4>Arrival order (today)</h4><div class="big">20 <span class="small muted">of 100</span></div>${dots(20, '')}</div>
       <div class="arr"><h4>AlertLens order</h4><div class="big" style="color:var(--accent2)">${cap} <span class="small muted">of 100</span></div>${dots(cap, 'al')}</div>
@@ -354,7 +354,7 @@ function renderTry() {
       <div class="row" style="margin-top:10px"><button class="btn primary" id="u-go">Score CSV</button><button class="btn ghost" id="u-template">Download a template</button></div>
       <div id="u-err" class="err"></div></div>
   </div>
-  <div class="card"><h3>3 · Edit a real queue alert</h3><p class="hint">Open any alert and use "What if": remove the burst, add micro transfers, shift amounts. The waterfall shows which reason changed.</p><button class="btn ghost" id="t-open">Open a random alert from the queue</button></div>`;
+  <div class="card"><h3>3 · Edit any queue alert</h3><p class="hint">Open any alert and use "What if": remove the burst, add micro transfers, shift amounts. The waterfall shows which reason changed.</p><button class="btn ghost" id="t-open">Open a random alert from the queue</button></div>`;
   ['burst', 'n', 'shift'].forEach(k => { const i = $('#g-' + k); i.oninput = () => $('#g-' + k + '-v').textContent = k === 'shift' ? (+i.value).toFixed(1) : i.value; });
   $('#g-go').onclick = async () => {
     PREV = 'try'; show('detail'); $('#page-detail').innerHTML = '<div class="spinner">Generating and scoring…</div>';
@@ -396,12 +396,12 @@ async function renderHow() {
       <div class="step"><div class="n">5</div><b>Officer decides</b><span>Ranked queue, plain-language reasons, memo in EN/UZ/RU, decision with a chained audit receipt.</span></div>
     </div></div>
   <div class="grid g23">
-    <div class="card"><h3>Our edge: a hidden client group we found in the data</h3><p class="hint">Incoming bank transfers at the very bottom of the amount scale fall into two narrow bands. Clients in the left band were escalated ≈10% of the time; clients in the right band ≈30%. The two bands never appear in the same client, so they work as labels for free. Aggregate of the labelled competition data.</p>
+    <div class="card"><h3>Our edge: a hidden client group we found in the data</h3><p class="hint">Incoming bank transfers at the very bottom of the amount scale fall into two narrow bands. Clients in the left band were escalated ≈10% of the time; clients in the right band ≈30%. The two bands never appear in the same client, so they work as labels for free. Aggregate of the labelled competition dataset (synthetic, provided by the organisers).</p>
       <div class="chartbox"><canvas id="c-floor"></canvas></div></div>
     <div class="card"><h3>Why it is hard to copy</h3>
       <p class="small">Another team with the same LLM tools cannot rebuild this in a weekend. The advantage comes from the data, not from a prompt:</p>
       <ul class="small">
-        <li><b>Discovery:</b> the micro-amount bands and their 10% vs. 30% escalation rates came out of our own analysis of 10 million transactions.</li>
+        <li><b>Discovery:</b> the micro-amount bands and their 10% vs. 30% escalation rates came out of our own analysis of the 10 million competition transactions.</li>
         <li><b>Model:</b> a second model learns the group from ordinary behaviour, so clients without marker transactions are covered too.</li>
         <li><b>Engineering:</b> trained trees are exported to plain numpy, so the scorer runs on any bank server, and each score breaks down exactly into reasons.</li>
         <li><b>Domain:</b> P1/P2/P3 bands, a memo in three languages and an audit chain fit the existing compliance process.</li>
@@ -412,7 +412,7 @@ async function renderHow() {
       <div>${ICON.shield}<b>Inside the perimeter</b><span>No customer data leaves the bank. numpy only, no external API.</span></div>
       <div>${ICON.eye}<b>Explainable</b><span>Every score breaks down exactly into reasons with measured values.</span></div>
       <div>${ICON.doc}<b>Deterministic memo</b><span>Template-based in EN/UZ/RU: no hallucinations, reproducible for audit.</span></div>
-      <div>${ICON.user}<b>Human in the loop</b><span>Nothing is auto-closed. The officer decides; P3 alerts are still reviewed.</span></div>
+      <div>${ICON.user}<b>Human in the loop</b><span>Nothing is auto-closed. The officer decides; P3 alerts are still reviewed. In the bank, officers sign in with the bank's SSO, with roles for officer, supervisor and auditor.</span></div>
       <div>${ICON.lock}<b>Tamper-evident</b><span>Each decision gets a SHA-256 receipt chained to the previous one.</span></div>
     </div></div>`;
   const fb = m.floor_bands.bank_in;
@@ -438,7 +438,7 @@ async function renderModel() {
     <div class="kpi"><div class="v">${live ? live.server : m.speed.ms_per_alert_cpu_single_core} ms</div><div class="l">to score one alert incl. feature extraction${live ? ` (measured just now; round trip ${live.round} ms)` : ''}</div></div>
   </div>
   <div class="grid g2">
-    <div class="card"><h3>Escalations reached vs. share of queue reviewed</h3><p class="hint">Test set: ${m.test_set.n_alerts.toLocaleString()} real alerts, ${m.test_set.n_escalated} escalated (${pct(m.test_set.base_rate, 1)}), a stratified 20% split never used in training. 5-fold CV on the training part: AUC ${m.cv_auc_train80.toFixed(3)}.</p><div class="chartbox"><canvas id="c-cap"></canvas></div></div>
+    <div class="card"><h3>Escalations reached vs. share of queue reviewed</h3><p class="hint">Test set: ${m.test_set.n_alerts.toLocaleString()} held-out competition alerts, ${m.test_set.n_escalated} escalated (${pct(m.test_set.base_rate, 1)}), a stratified 20% split never used in training. 5-fold CV on the training part: AUC ${m.cv_auc_train80.toFixed(3)}.</p><div class="chartbox"><canvas id="c-cap"></canvas></div></div>
     <div class="card"><h3>Queue bands</h3><p class="hint">Thresholds fixed on the test set.</p>
       <table><tr><th>band</th><th>share of alerts</th><th>escalated</th><th>handling</th></tr>
       ${m.bands.map(b => `<tr><td><span class="chip ${b.name}">${b.name}</span></td><td>${pct(b.share)}</td><td><b>${pct(b.rate, 1)}</b></td><td>${BAND[b.name].action}</td></tr>`).join('')}</table>
@@ -457,7 +457,7 @@ async function renderModel() {
       </ul></div>
     <div class="card"><h3>Data and licences</h3>
       <ul class="small">
-        <li><b>Training and test:</b> WIUT Hackathon 2026 elimination-round dataset (anonymised alerts with 180-day transactions), used under the competition terms. Not redistributed: only model files and aggregate statistics are published.</li>
+        <li><b>Training and test:</b> WIUT Hackathon 2026 elimination-round dataset: 20,000 alerts with 180-day transactions (≈10 million). The organisers state it is synthetic, transformed and localised, with no real customer or transaction records from the Central Bank or any commercial bank. Used under the competition terms; only model files and aggregate statistics are published.</li>
         <li><b>Demo alerts:</b> synthetic, generated from aggregate statistics by <code>synth/generate.py</code>.</li>
         <li><b>Code:</b> MIT. Elimination-round findings reused and declared in the README. numpy (BSD) at runtime; LightGBM (MIT) and scikit-learn (BSD) for training only; Chart.js (MIT).</li>
       </ul></div>
@@ -507,13 +507,13 @@ function calcROI() {
   $('#roi-kpis').innerHTML = `
     <div class="kpi"><div class="v teal">${U(hours)} h</div><div class="l">officer hours freed per month</div></div>
     <div class="kpi"><div class="v teal">${(money / 1e6).toFixed(1)}M UZS</div><div class="l">value of freed time per month</div></div>
-    <div class="kpi"><div class="v teal">+${U(extra)}</div><div class="l">more real escalations handled the same day, per month</div></div>
+    <div class="kpi"><div class="v teal">+${U(extra)}</div><div class="l">more escalations handled the same day, per month</div></div>
     <div class="kpi"><div class="v">${isFinite(payback) ? payback.toFixed(1) + ' mo' : '—'}</div><div class="l">payback of the pilot</div></div>`;
   $('#r-out').innerHTML = `<table>
     <tr><td>Escalations per month (${pct(m.test_set.base_rate, 1)} of alerts)</td><td><b>${U(escN)}</b></td></tr>
     <tr><td>Handled the same day: arrival order → AlertLens (capacity ${pct(cap)})</td><td><b>${pct(cap)} → ${pct(sameAL)}</b></td></tr>
-    <tr><td>Extra real escalations handled the same day</td><td><b>+${U(extra)} / month</b></td></tr>
-    <tr><td>Average waiting time of a real escalation</td><td><b>−${pct(wait)}</b></td></tr>
+    <tr><td>Extra escalations handled the same day</td><td><b>+${U(extra)} / month</b></td></tr>
+    <tr><td>Average waiting time of an escalation</td><td><b>−${pct(wait)}</b></td></tr>
     <tr><td>Hours freed by a light review of P3 (${pct(p3)} of alerts, ${pct(m.bands[2].rate, 1)} escalated)</td><td><b>${U(hours)} h / month</b></td></tr>
     <tr><td>Value of freed hours</td><td><b>${U(money)} UZS / month</b></td></tr>
     <tr><td>Pilot cost</td><td><b>${U(pilot)} UZS</b></td></tr>
@@ -547,7 +547,7 @@ function renderAudit() {
 const TOUR = [
   {sel: '.qrow', page: 'queue', t: 'The ranked queue', p: 'Every alert gets an escalation probability. P1 means review today. Officers simply work from the top.'},
   {sel: '#t-tools', page: 'queue', t: 'Compare with today', p: 'Switch to "Arrival order" to see the current process: high-risk alerts are scattered through the queue.'},
-  {sel: '#t-why', page: 'queue', t: 'Measured, not promised', p: 'On 2,800 real alerts the model never saw, the top 20% of our queue holds 36 of every 100 real escalations; arrival order holds 20.'},
+  {sel: '#t-why', page: 'queue', t: 'Measured, not promised', p: 'On 2,800 held-out alerts the model never saw, the top 20% of our queue holds 36 of every 100 escalations; arrival order holds 20.'},
   {sel: '#t-dhero', page: 'detail', t: 'One-glance verdict', p: 'Risk gauge, band and a plain-language summary of why, written from measured facts about the client.'},
   {sel: '#t-water', page: 'detail', t: 'Exactly why', p: 'Starting from the average alert, each reason moves the probability up or down. The steps add up exactly to the score.'},
   {sel: '#t-memo', page: 'detail', t: 'Memo in three languages', p: 'The case memo is drafted in English, Uzbek or Russian with fixed templates: no hallucinations, reproducible for audit.'},

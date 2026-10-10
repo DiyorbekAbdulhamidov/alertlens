@@ -1,6 +1,9 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": null,
+  "regions": [
+    "fra1"
+  ],
   "functions": {
     "api/**/*.py": {
       "includeFiles": "{core,synth,server,artifacts}/**",

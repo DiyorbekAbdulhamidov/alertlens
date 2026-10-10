@@ -16,7 +16,7 @@ Transaction monitoring produces far more alerts than officers can review careful
 4. **Keeps the human in the loop**: the officer escalates, dismisses or requests information, and every decision gets a SHA-256 receipt chained to the previous one (tamper-evident audit log).
 5. **What-if and jury input**: re-score live after removing the pre-alert burst, adding micro-amount transfers or shifting amounts, or upload any CSV of transactions.
 
-## Results (held-out test set: 2,800 real alerts, never used for training)
+## Results (held-out test set: 2,800 competition alerts, never used for training)
 
 | metric | value |
 |---|---|
@@ -78,6 +78,16 @@ curl -X POST localhost:8000/api/score -H 'Content-Type: application/json' -d '{
 
 `direction`: `in` | `out`. `type`: `bank` | `card` | `cash` | `intl`. `amount_index`: normalised log-amount, on the same scale as the monitoring feed. CSV with header `time,direction,type,amount_index` is accepted too.
 
+## Deployment
+
+- **Public demo:** Vercel. Static front-end on the CDN and the Python API as serverless functions in region `fra1` (Frankfurt), deployed automatically from this repository on every push to `master`; Vercel keeps the deployment history.
+- **Bank (production design):** the same code in one Docker container (`Dockerfile`) on a server or Kubernetes cluster inside the bank's network. numpy only, no outbound internet, no paid API. Officers sign in through the bank's SSO (Active Directory). The roles are officer, supervisor and auditor, and every action is logged with the user ID in an append-only table. Model files are versioned, and retraining runs offline on the bank's labelled alert history.
+
+```bash
+docker build -t alertlens .
+docker run -p 8000:8000 alertlens     # http://<server>:8000
+```
+
 ## Retrain (requires the competition data, which is not included)
 
 ```bash
@@ -102,7 +112,7 @@ Deterministic: the split uses seed 2026 and LightGBM runs with `deterministic=Tr
 
 | source | use | licence / terms |
 |---|---|---|
-| WIUT Hackathon 2026 elimination-round dataset (anonymised alerts + 180-day transactions) | training and held-out evaluation | competition terms and NDA. Not redistributed; only trained model files and aggregate statistics are published |
+| WIUT Hackathon 2026 elimination-round dataset (20,000 alerts, ≈10M transactions; per the organisers synthetic, transformed and localised, no real customer records) | training and held-out evaluation | competition terms and NDA. Not redistributed; only trained model files and aggregate statistics are published |
 | Synthetic alerts (`synth/generate.py`, `synth/params.json`) | public demo | our own; generated from aggregate statistics (quantiles, covariances, marker rates), no individual records |
 | numpy | inference | BSD-3-Clause |
 | LightGBM, scikit-learn, pandas, pyarrow | training only | MIT, BSD-3-Clause, BSD-3-Clause, Apache-2.0 |
