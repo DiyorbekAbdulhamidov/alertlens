@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+.vercel
+data/
+local_build/
+*.parquet
+.env

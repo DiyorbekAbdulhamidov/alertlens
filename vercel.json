@@ -1,0 +1,11 @@
+{
+  "functions": {
+    "api/*.py": {
+      "includeFiles": "{core,synth,server,artifacts}/**",
+      "maxDuration": 30
+    }
+  },
+  "headers": [
+    { "source": "/assets/(.*)", "headers": [{ "key": "Cache-Control", "value": "public, max-age=300" }] }
+  ]
+}
