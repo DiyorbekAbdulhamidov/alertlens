@@ -57,7 +57,8 @@ const ICON = {
   eye: I('<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>', 22),
   user: I('<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>', 22),
   shield: I('<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/>', 22),
-  doc: I('<path d="M6 2h9l5 5v15H6z"/><path d="M14 2v6h6M9 13h6M9 17h6"/>', 22)
+  doc: I('<path d="M6 2h9l5 5v15H6z"/><path d="M14 2v6h6M9 13h6M9 17h6"/>', 22),
+  spark: I('<path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/>', 20)
 };
 const conceptIcon = k => ICON[k] || (k.startsWith('bank') ? ICON.bank : k.startsWith('card') ? ICON.card : k.startsWith('cash') ? ICON.cash : k.startsWith('intl') ? ICON.intl : ICON.activity);
 
@@ -250,6 +251,12 @@ function renderDetail(r, prev) {
         </div><div id="w-err" class="err"></div></div>
     </div>
   </div>
+  <div class="card ai" id="t-ai">
+    <div class="row" style="justify-content:space-between;align-items:flex-start"><div><h3>${ICON.spark} Ask AlertLens AI</h3><p class="hint" style="margin:0">An LLM copilot that explains this score in plain language. It only sees the facts computed by our model, never decides, and every number in its answer is checked against those facts.</p></div>
+      <span class="chip U">open-weight LLM · grounded</span></div>
+    <div class="row" style="margin:12px 0 8px">${AI_SUGGEST.map((q, i) => `<button class="btn ghost sm" data-aiq="${i}">${esc(q[0])}</button>`).join('')}</div>
+    <div class="row" style="flex-wrap:nowrap"><input type="text" id="ai-q" placeholder="Ask anything about this alert…" style="flex:1"><select id="ai-lang" style="width:auto"><option value="en">EN</option><option value="uz">UZ</option><option value="ru">RU</option></select><button class="btn primary" id="ai-go">Ask</button></div>
+    <div id="ai-out" style="margin-top:12px"></div></div>
   <div class="card"><details><summary>Feature-level audit trail (for model validation)</summary>
     <table style="margin-top:8px"><tr><th>feature</th><th>value</th><th>peer median</th><th>log-odds</th></tr>
     ${r.reasons.features.map(f => `<tr><td><code>${esc(f.feature)}</code></td><td>${f.value ?? '—'}</td><td>${f.peer_median == null ? '—' : (+f.peer_median).toFixed(3)}</td><td>${f.logodds.toFixed(3)}</td></tr>`).join('')}</table>
@@ -261,6 +268,33 @@ function renderDetail(r, prev) {
   $$('[data-dec]').forEach(b => b.onclick = () => decide(b.dataset.dec));
   $$('[data-w]').forEach(b => b.onclick = () => whatIf(b.dataset.w));
   drawWaterfall(r); drawDaily(tx); drawBurst(tx);
+  $('#ai-lang').value = MEMO_LANG;
+  $$('[data-aiq]').forEach(b => b.onclick = () => { $('#ai-q').value = AI_SUGGEST[+b.dataset.aiq][1]; askAI(); });
+  $('#ai-go').onclick = askAI;
+  $('#ai-q').onkeydown = e => { if (e.key === 'Enter') askAI(); };
+}
+const AI_SUGGEST = [
+  ['Why is it risky?', 'Why did this alert get this score? Answer in 3 short bullets.'],
+  ['What should I check next?', 'What should I check next before deciding? Give 4 concrete checks tied to the facts.'],
+  ['Draft a request to the client', 'Draft a short, polite request to the client asking for documents on the source of funds and the purpose of the recent transfers. Do not mention the risk score.'],
+  ['Summary for my supervisor', 'Summarise this alert for my supervisor in two sentences.'],
+  ['Explain the client group', 'Explain in simple words what the hidden client group means for this alert.']
+];
+async function askAI() {
+  const q = $('#ai-q').value.trim(); if (!q) return;
+  const out = $('#ai-out'), lang = $('#ai-lang').value, btn = $('#ai-go');
+  btn.disabled = true; out.innerHTML = '<div class="ai-ans muted">Thinking… the copilot is reading the facts computed by the model.</div>';
+  try {
+    const r = await getJSON(API + '/copilot', {method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({alert_id: CUR.id, transactions: CUR.transactions, question: q, lang})});
+    const ver = r.all_numbers_verified ? '<span class="chip N">✓ every number verified against the model\'s facts</span>'
+      : `<span class="chip P2">⚠ check these numbers: ${r.unverified_numbers.join(', ')}</span>`;
+    out.innerHTML = `<div class="ai-q">${esc(q)}</div><div class="ai-ans">${esc(r.answer).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').replace(/\n/g, '<br>')}</div>
+      <div class="row" style="margin-top:8px">${ver}<span class="chip U">${esc(r.model)} · ${r.latency_ms} ms</span></div>
+      <details style="margin-top:8px"><summary>Facts the AI was allowed to use</summary><pre class="facts-json">${esc(JSON.stringify(r.facts, null, 1))}</pre></details>`;
+  } catch (e) {
+    out.innerHTML = `<div class="err">The AI copilot is unavailable right now (${esc(e.message)}). The score, reasons and memo above do not depend on it.</div>`;
+  } finally { btn.disabled = false; }
 }
 function setMemo(l) { MEMO_LANG = l; $('#memo').value = CUR.memo[l]; $$('#memo-seg button').forEach(b => b.classList.toggle('active', b.dataset.l === l)); }
 function drawWaterfall(r) {
@@ -393,7 +427,7 @@ async function renderHow() {
       <div class="step"><div class="n">2</div><b>280 features</b><span>Pre-alert burst, amounts vs. other clients on the same day, a statistical profile per channel, micro-amount markers.</span></div>
       <div class="step"><div class="n">3</div><b>Hidden client group</b><span>A label-free model recognises the high-risk vs. low-risk group (AUC ${m.typology_model.oof_auc_on_markers.toFixed(2)} at recovering it).</span></div>
       <div class="step"><div class="n">4</div><b>Risk score</b><span>Gradient-boosted trees give the escalation probability in ≈${m.speed.ms_per_alert_cpu_single_core} ms, with an exact breakdown by reason.</span></div>
-      <div class="step"><div class="n">5</div><b>Officer decides</b><span>Ranked queue, plain-language reasons, memo in EN/UZ/RU, decision with a chained audit receipt.</span></div>
+      <div class="step"><div class="n">5</div><b>Officer + AI copilot</b><span>Ranked queue, plain-language reasons, memo in EN/UZ/RU, a grounded LLM copilot for questions and drafts, decision with a chained audit receipt.</span></div>
     </div></div>
   <div class="grid g23">
     <div class="card"><h3>Our edge: a hidden client group we found in the data</h3><p class="hint">Incoming bank transfers at the very bottom of the amount scale fall into two narrow bands. Clients in the left band were escalated ≈10% of the time; clients in the right band ≈30%. The two bands never appear in the same client, so they work as labels for free. Aggregate of the labelled competition dataset (synthetic, provided by the organisers).</p>
@@ -414,6 +448,7 @@ async function renderHow() {
       <div>${ICON.doc}<b>Deterministic memo</b><span>Template-based in EN/UZ/RU: no hallucinations, reproducible for audit.</span></div>
       <div>${ICON.user}<b>Human in the loop</b><span>Nothing is auto-closed. The officer decides; P3 alerts are still reviewed. In the bank, officers sign in with the bank's SSO, with roles for officer, supervisor and auditor.</span></div>
       <div>${ICON.lock}<b>Tamper-evident</b><span>Each decision gets a SHA-256 receipt chained to the previous one.</span></div>
+      <div>${ICON.spark}<b>Grounded AI copilot</b><span>An open-weight LLM explains and drafts in EN/UZ/RU from the model's facts only. Every number is verified. In the bank it runs on an internal server.</span></div>
     </div></div>`;
   const fb = m.floor_bands.bank_in;
   chart('floor', $('#c-floor'), {type: 'bar', data: {labels: fb.map(b => b.lo.toFixed(3)), datasets: [
@@ -551,6 +586,7 @@ const TOUR = [
   {sel: '#t-dhero', page: 'detail', t: 'One-glance verdict', p: 'Risk gauge, band and a plain-language summary of why, written from measured facts about the client.'},
   {sel: '#t-water', page: 'detail', t: 'Exactly why', p: 'Starting from the average alert, each reason moves the probability up or down. The steps add up exactly to the score.'},
   {sel: '#t-memo', page: 'detail', t: 'Memo in three languages', p: 'The case memo is drafted in English, Uzbek or Russian with fixed templates: no hallucinations, reproducible for audit.'},
+  {sel: '#t-ai', page: 'detail', t: 'Ask the AI copilot', p: 'An open-weight LLM explains the score in English, Uzbek or Russian, suggests next checks and drafts letters. It only sees the model\'s facts, and every number it writes is verified.'},
   {sel: '#t-decide', page: 'detail', t: 'The officer decides', p: 'Nothing is auto-closed. Each decision gets a SHA-256 receipt chained to the previous one.'},
   {sel: '#t-whatif', page: 'detail', t: 'Try it yourself', p: 'Change the client\'s data and the score updates live. Or go to "Score your own" and give us any client.'}
 ];

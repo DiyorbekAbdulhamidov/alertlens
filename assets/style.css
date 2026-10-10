@@ -124,7 +124,7 @@ details summary{cursor:pointer;font-weight:700;font-size:13px;color:var(--ink2)}
 .step{background:#fbfcfe;border:1px solid var(--line);border-radius:14px;padding:14px;position:relative}
 .step .n{width:28px;height:28px;border-radius:50%;background:var(--accent);color:#fff;font-weight:800;display:flex;align-items:center;justify-content:center;font-size:13px;margin-bottom:8px}
 .step b{display:block;margin-bottom:4px}.step span{font-size:12.5px;color:var(--ink2)}
-.trust{display:grid;grid-template-columns:repeat(5,1fr);gap:12px}
+.trust{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
 .trust div{border:1px solid var(--line);border-radius:14px;padding:14px;background:#fff}
 .trust svg{color:var(--accent)}.trust b{display:block;margin:6px 0 3px}.trust span{font-size:12.5px;color:var(--ink2)}
 .bandchip{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:middle}
@@ -154,3 +154,9 @@ details summary{cursor:pointer;font-weight:700;font-size:13px;color:var(--ink2)}
   .pipe,.trust{grid-template-columns:1fr 1fr}
   .hero{padding:18px}
 }
+
+.card.ai{border:1px solid #b9e7e4;background:linear-gradient(180deg,#f4fbfb 0%,#fff 60%)}
+.card.ai h3{display:flex;align-items:center;gap:8px;color:var(--accent2)}
+.ai-q{font-weight:700;margin-bottom:6px}
+.ai-ans{background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px 14px;font-size:14.5px;line-height:1.6}
+.facts-json{font:12px/1.4 ui-monospace,Consolas,monospace;background:#f6f8fb;border:1px solid var(--line);border-radius:10px;padding:10px;max-height:260px;overflow:auto;white-space:pre-wrap}

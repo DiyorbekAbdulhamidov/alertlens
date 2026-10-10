@@ -15,6 +15,7 @@ Transaction monitoring produces far more alerts than officers can review careful
 3. **Drafts the case memo** in English, Uzbek and Russian from those reasons. It is deterministic, with no LLM in the decision path.
 4. **Keeps the human in the loop**: the officer escalates, dismisses or requests information, and every decision gets a SHA-256 receipt chained to the previous one (tamper-evident audit log).
 5. **What-if and jury input**: re-score live after removing the pre-alert burst, adding micro-amount transfers or shifting amounts, or upload any CSV of transactions.
+6. **Grounded AI copilot**: the officer asks questions in English, Uzbek or Russian ("why is it risky?", "what should I check next?", "draft a request for documents"). An open-weight LLM answers using only a FACTS JSON computed server-side by the scorer, and every number in its answer is checked against those facts. The LLM never produces the score or the decision. Demo: `meta/llama-3.3-70b` through Vercel AI Gateway (OIDC auth, no key in the code). Bank: the same open-weight model served internally (set `ALERTLENS_LLM_URL`); scoring works without it.
 
 ## Results (held-out test set: 2,800 competition alerts, never used for training)
 
@@ -49,8 +50,8 @@ alert + 180-day transactions
 
 ```
 api/            Vercel entry points (one per route) → server/app.py
-server/app.py   HTTP API: /api/queue, /api/alert, /api/score, /api/generate, /api/metrics, /api/receipt, /api/health
-core/           features.py, model.py (numpy tree inference + attributions), reasons.py, scorer.py
+server/app.py   HTTP API: /api/queue, /api/alert, /api/score, /api/generate, /api/metrics, /api/receipt, /api/copilot, /api/health
+core/           features.py, model.py (numpy tree inference + attributions), reasons.py, scorer.py, copilot.py (grounded LLM)
 synth/          synthetic alert generator + aggregate parameters (params.json)
 artifacts/      model.npz (exported trees + de-trending tables), metrics, calibration, population medians
 training/       prepare_data.py → build_dataset.py → train.py → export.py → evaluate.py (needs the NDA data)

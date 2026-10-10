@@ -8,6 +8,7 @@ POST /api/score                      score your own transactions (JSON or CSV), 
 GET  /api/generate?typology=S|N|none&burst=40&n=500&shift=0&seed=1   new synthetic client + score
 GET  /api/metrics                    held-out test-set metrics of the deployed model
 POST /api/receipt                    tamper-evident audit receipt for an officer decision
+POST /api/copilot                    LLM explanation grounded on the scorer's facts (see core/copilot.py)
 """
 import os, sys, json, time, hashlib, io, csv
 from http.server import BaseHTTPRequestHandler
@@ -19,6 +20,7 @@ import numpy as np
 from core.scorer import Scorer
 from core.reasons import memo
 from synth.generate import Generator
+from core import copilot
 
 MODEL_VERSION = 'alertlens-1.0 (LightGBM-exported, 1500 trees + typology 2000 trees)'
 _S = None
@@ -177,6 +179,24 @@ class handler(BaseHTTPRequestHandler):
             if u.path.rstrip('/').endswith('/score'):
                 c = parse_transactions(body, self.headers.get('Content-Type', ''))
                 return self._send(200, full_result('UPLOAD-' + hashlib.sha1(body.encode()).hexdigest()[:8], c))
+            if u.path.rstrip('/').endswith('/copilot'):
+                d = json.loads(body or '{}')
+                tx = d.get('transactions') or {}
+                c = {k: tx[k] for k in ('alert_t', 't', 'is_in', 'typ', 'amt')}
+                if len(c['t']) > 5000:
+                    raise ValueError('max 5000 transactions per alert')
+                r = run(c)
+                feats = r.pop('features')
+                kv = {k: feats.get(k) for k in ('n_hist', 'n_burst', 'active_days', 'blk_S_n', 'blk_N_n')}
+                m = json.load(open(os.path.join(ROOT, 'artifacts', 'metrics.json')))
+                facts = copilot.build_facts(str(d.get('alert_id', 'alert'))[:60], r, kv, m['bands'], S().pop)
+                token = (os.getenv('AI_GATEWAY_API_KEY') or os.getenv('VERCEL_OIDC_TOKEN')
+                         or self.headers.get('x-vercel-oidc-token'))
+                try:
+                    out = copilot.ask(str(d.get('question', '')), facts, d.get('lang', 'en'), token)
+                except RuntimeError as e:
+                    return self._send(503, {'error': str(e), 'facts': facts})
+                return self._send(200, {**out, 'facts': facts})
             if u.path.rstrip('/').endswith('/receipt'):
                 d = json.loads(body)
                 rec = {k: d.get(k) for k in ('alert_id', 'decision', 'officer', 'comment', 'probability', 'prev_hash')}
