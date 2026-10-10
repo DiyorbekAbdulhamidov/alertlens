@@ -1,6 +1,6 @@
 {
   "functions": {
-    "api/*.py": {
+    "api/**/*.py": {
       "includeFiles": "{core,synth,server,artifacts}/**",
       "maxDuration": 30
     }
