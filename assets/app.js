@@ -1,6 +1,8 @@
 /* AlertLens officer workspace (vanilla JS + Chart.js). Talks only to this site's /api. */
 const API = '/api';
 const TYPES = ['bank', 'card', 'cash', 'intl'];
+const USD_UZS = 11778;  // CBU official rate, 6 Oct 2026
+const LLM_Q_USD = 0.00075;  // measured on the live demo, 10 Oct 2026: $0.00068–0.00079 per copilot question (Vercel AI Gateway usage.cost)
 const TYPE_LABEL = {bank: 'Bank transfer', card: 'Card', cash: 'Cash', intl: 'International'};
 const TYPE_COLOR = ['#3b82f6', '#0ea5a0', '#f59e0b', '#8b5cf6'];
 const BAND = {
@@ -290,7 +292,7 @@ async function askAI() {
     const ver = r.all_numbers_verified ? '<span class="chip N">✓ every number verified against the model\'s facts</span>'
       : `<span class="chip P2">⚠ check these numbers: ${r.unverified_numbers.join(', ')}</span>`;
     out.innerHTML = `<div class="ai-q">${esc(q)}</div><div class="ai-ans">${esc(r.answer).replace(/^[ \t]*[*\-][ \t]+/gm, '• ').replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').replace(/\n/g, '<br>')}</div>
-      <div class="row" style="margin-top:8px">${ver}<span class="chip U">${esc(r.model)} · ${r.latency_ms} ms</span></div>
+      <div class="row" style="margin-top:8px">${ver}<span class="chip U">${esc(r.model)} · ${r.latency_ms} ms${r.usage && typeof r.usage.cost === 'number' ? ` · cost $${r.usage.cost.toFixed(5)} ≈ ${Math.max(1, Math.round(r.usage.cost * USD_UZS))} UZS` : ''}</span></div>
       <details style="margin-top:8px"><summary>Facts the AI was allowed to use</summary><pre class="facts-json">${esc(JSON.stringify(r.facts, null, 1))}</pre></details>`;
   } catch (e) {
     out.innerHTML = `<div class="err">The AI copilot is unavailable right now (${esc(e.message)}). The score, reasons and memo above do not depend on it.</div>`;
@@ -421,7 +423,7 @@ function renderTry() {
 async function renderHow() {
   const el = $('#page-how'); const m = await metrics();
   el.innerHTML = `
-  <div class="card"><h3>From raw transactions to a ranked, explained queue</h3><p class="hint">The whole pipeline runs inside the bank. Scoring needs only numpy: no external API, no GPU, no internet.</p>
+  <div class="card"><h3>From raw transactions to a ranked, explained queue</h3><p class="hint">In production the whole pipeline runs inside the bank. Scoring needs only numpy: no external API, no GPU, no internet. The copilot uses an open-weight model on one internal GPU. (This public demo calls the copilot model through Vercel AI Gateway.)</p>
     <div class="pipe">
       <div class="step"><div class="n">1</div><b>Alert arrives</b><span>The monitoring system raises an alert. AlertLens reads the client's last 180 days of transactions (≈500).</span></div>
       <div class="step"><div class="n">2</div><b>280 features</b><span>Pre-alert burst, amounts vs. other clients on the same day, a statistical profile per channel, micro-amount markers.</span></div>
@@ -443,13 +445,14 @@ async function renderHow() {
   </div>
   <div class="card"><h3>Built for a regulated bank</h3>
     <div class="trust">
-      <div>${ICON.shield}<b>Inside the perimeter</b><span>No customer data leaves the bank. numpy only, no external API.</span></div>
+      <div>${ICON.shield}<b>Inside the perimeter</b><span>No customer data leaves the bank. Scoring is numpy only; the copilot model runs on the bank's own GPU. No external API in production.</span></div>
       <div>${ICON.eye}<b>Explainable</b><span>Every score breaks down exactly into reasons with measured values.</span></div>
       <div>${ICON.doc}<b>Deterministic memo</b><span>Template-based in EN/UZ/RU: no hallucinations, reproducible for audit.</span></div>
       <div>${ICON.user}<b>Human in the loop</b><span>Nothing is auto-closed. The officer decides; P3 alerts are still reviewed. In the bank, officers sign in with the bank's SSO, with roles for officer, supervisor and auditor.</span></div>
       <div>${ICON.lock}<b>Tamper-evident</b><span>Each decision gets a SHA-256 receipt chained to the previous one.</span></div>
-      <div>${ICON.spark}<b>Grounded AI copilot</b><span>An open-weight LLM explains and drafts in EN/UZ/RU from the model's facts only. Every number is verified. In the bank it runs on an internal server.</span></div>
-    </div></div>`;
+      <div>${ICON.spark}<b>Grounded AI copilot</b><span>An open-weight LLM explains and drafts in EN/UZ/RU from the model's facts only. Every number is verified. In the bank it runs on one internal GPU (NVIDIA L4).</span></div>
+    </div>
+    <p class="small" style="margin-top:14px"><b>Deployment.</b> Demo: Vercel (static site on the CDN + Python API functions), deployed automatically from our public GitHub repository, with the full deployment history. Bank: the same code in one Docker container on an internal server, the copilot model on one internal GPU, sign-in through the bank's SSO, decisions in an append-only audit table. No outbound internet.</p></div>`;
   const fb = m.floor_bands.bank_in;
   chart('floor', $('#c-floor'), {type: 'bar', data: {labels: fb.map(b => b.lo.toFixed(3)), datasets: [
       {type: 'line', label: 'escalation rate of these clients', data: fb.map(b => b.esc_rate), yAxisID: 'y2', borderColor: '#0f1b2d', backgroundColor: '#0f1b2d', pointRadius: 3, tension: .2},
@@ -479,7 +482,8 @@ async function renderModel() {
       ${m.bands.map(b => `<tr><td><span class="chip ${b.name}">${b.name}</span></td><td>${pct(b.share)}</td><td><b>${pct(b.rate, 1)}</b></td><td>${BAND[b.name].action}</td></tr>`).join('')}</table>
       <p class="small">P1 alerts are escalated <b>${(m.bands[0].rate / m.bands[2].rate).toFixed(1)}×</b> as often as P3. The ranking sets priority only: every alert is still reviewed by a person.</p>
       <h3 style="margin-top:14px">Speed and cost</h3>
-      <p class="small">≈${m.speed.ms_per_alert_cpu_single_core} ms of one CPU core per alert, so 1 million alerts take ≈${cpuHours} CPU-hours. A single 4-vCPU server inside the bank is enough. No GPU, no paid API.</p></div>
+      <p class="small"><b>Scoring:</b> ≈${m.speed.ms_per_alert_cpu_single_core} ms of one CPU core per alert, so 1 million alerts take ≈${cpuHours} CPU-hours. A single 4-vCPU server inside the bank is enough: no GPU, no paid API.</p>
+      <p class="small"><b>AI copilot:</b> in this demo ≈$${LLM_Q_USD} (≈${Math.round(LLM_Q_USD * USD_UZS)} UZS) per question on Vercel AI Gateway, measured and paid by our team. In the bank an open-weight model runs on one 24 GB GPU inside the perimeter; its cost is in Budget &amp; ROI.</p></div>
   </div>
   <div class="grid g2">
     <div class="card"><h3>Where it is weaker (measured)</h3>
@@ -495,6 +499,8 @@ async function renderModel() {
         <li><b>Training and test:</b> WIUT Hackathon 2026 elimination-round dataset: 20,000 alerts with 180-day transactions (≈10 million). The organisers state it is synthetic, transformed and localised, with no real customer or transaction records from the Central Bank or any commercial bank. Used under the competition terms; only model files and aggregate statistics are published.</li>
         <li><b>Demo alerts:</b> synthetic, generated from aggregate statistics by <code>synth/generate.py</code>.</li>
         <li><b>Code:</b> MIT. Elimination-round findings reused and declared in the README. numpy (BSD) at runtime; LightGBM (MIT) and scikit-learn (BSD) for training only; Chart.js (MIT).</li>
+        <li><b>Copilot models:</b> Llama 3.3 70B by Meta (Llama 3.3 Community License), fallback Qwen3-32B by Alibaba (Apache-2.0), called through Vercel AI Gateway (paid per use).</li>
+        <li><b>Cost and problem figures:</b> PwC, INETCO, yep.uz, gpupoet (GPU price), CBU (exchange rate). Full list in the README.</li>
       </ul></div>
   </div>`;
   const c = m.capture_curve;
@@ -523,9 +529,17 @@ async function renderROI() {
       ${f('r-capacity', 'Share of each day\'s alerts reviewed the same day, %', 50, 5)}
       <h3 style="margin-top:16px">Pilot (3 months)</h3>
       ${f('r-team', 'Team: people × months × monthly cost, UZS', 3 * 3 * 8000000, 1000000, 'Assumption: 3 people × 3 months × 8M UZS.')}
-      ${f('r-infra', 'One server inside the bank (4 vCPU), UZS', 6000000, 500000)}
-      ${f('r-run', 'Running cost per month after the pilot, UZS', 4000000, 500000)}</div>
-    <div class="card"><h3>Results</h3><div id="r-out"></div></div>
+      ${f('r-infra', 'One server inside the bank (4 vCPU), UZS', 6000000, 500000, 'Assumption: a virtual server for scoring, the API and the audit table.')}
+      ${f('r-gpu', 'AI copilot inside the bank: one 24 GB GPU (NVIDIA L4), UZS', 40000000, 1000000, 'NVIDIA L4 ≈ $3,000 typical market price (gpupoet, 2026) + 12% VAT, at 11,778 UZS/$ (CBU, 6 Oct 2026). Runs an open-weight model (e.g. Qwen3-32B, Apache-2.0, 4-bit). Set to 0 to pilot without the copilot.')}
+      ${f('r-run', 'Running cost per month after the pilot, UZS', 4000000, 500000, 'Assumption: support, monitoring and monthly retraining.')}</div>
+    <div class="card"><h3>Results</h3><div id="r-out"></div>
+      <h3 style="margin-top:18px">Paid services in this demo (paid by our team)</h3>
+      <table>
+        <tr><td>Hosting: Vercel (Python API + static site), no hosting charges so far</td><td><b>0 UZS</b></td></tr>
+        <tr><td>AI copilot: Vercel AI Gateway, open-weight Llama 3.3 70B, pay per use. Measured on 10 Oct 2026: $0.00068–0.00079 per question</td><td><b>≈${Math.round(LLM_Q_USD * USD_UZS)} UZS / question</b></td></tr>
+        <tr><td>In the bank: no paid API. Scoring runs on the CPU server, the copilot on the GPU above</td><td><b>0 UZS / question</b></td></tr>
+      </table>
+      <p class="tiny muted" style="margin-top:6px">The live cost of each copilot answer is shown under the answer.</p></div>
   </div>`;
   $$('#page-roi input').forEach(i => i.oninput = calcROI);
   calcROI();
@@ -537,7 +551,8 @@ function calcROI() {
   const hours = alerts * p3 * Math.max(mins - fast, 0) / 60, money = hours * rate;
   const sameAL = capAt(cap), extra = escN * (sameAL - cap);
   const wait = (0.5 - m.mean_queue_position_of_escalations.alertlens) / 0.5;
-  const pilot = v('r-team') + v('r-infra'), net = money - v('r-run'), payback = net > 0 ? pilot / net : Infinity;
+  const pilot = v('r-team') + v('r-infra') + v('r-gpu'), net = money - v('r-run'), payback = net > 0 ? pilot / net : Infinity;
+  const pilotCore = v('r-team') + v('r-infra'), paybackCore = net > 0 ? pilotCore / net : Infinity;
   const U = x => Math.round(x).toLocaleString('en-US');
   $('#roi-kpis').innerHTML = `
     <div class="kpi"><div class="v teal">${U(hours)} h</div><div class="l">officer hours freed per month</div></div>
@@ -551,9 +566,11 @@ function calcROI() {
     <tr><td>Average waiting time of an escalation</td><td><b>−${pct(wait)}</b></td></tr>
     <tr><td>Hours freed by a light review of P3 (${pct(p3)} of alerts, ${pct(m.bands[2].rate, 1)} escalated)</td><td><b>${U(hours)} h / month</b></td></tr>
     <tr><td>Value of freed hours</td><td><b>${U(money)} UZS / month</b></td></tr>
-    <tr><td>Pilot cost</td><td><b>${U(pilot)} UZS</b></td></tr>
+    <tr><td>Pilot cost: team ${U(v('r-team'))} + server ${U(v('r-infra'))} + copilot GPU ${U(v('r-gpu'))}</td><td><b>${U(pilot)} UZS</b></td></tr>
     <tr><td>Net saving after running cost</td><td><b>${U(net)} UZS / month</b></td></tr>
-    <tr><td>Payback</td><td><b>${isFinite(payback) ? payback.toFixed(1) + ' months' : 'not reached with these inputs'}</b></td></tr></table>`;
+    <tr><td>Payback</td><td><b>${isFinite(payback) ? payback.toFixed(1) + ' months' : 'not reached with these inputs'}</b></td></tr>
+    <tr><td>Payback without the copilot GPU (ranking, reasons, memo, audit only)</td><td><b>${isFinite(paybackCore) ? paybackCore.toFixed(1) + ' months' : '—'}</b></td></tr>
+    <tr><td>Unit economics: running cost per alert vs. officer time for one full review</td><td><b>${alerts ? U(v('r-run') / alerts) : '—'} vs ${U(mins / 60 * rate)} UZS</b></td></tr></table>`;
 }
 
 /* ---------- audit ---------- */

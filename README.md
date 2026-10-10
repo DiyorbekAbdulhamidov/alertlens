@@ -15,7 +15,7 @@ Transaction monitoring produces far more alerts than officers can review careful
 3. **Drafts the case memo** in English, Uzbek and Russian from those reasons. It is deterministic, with no LLM in the decision path.
 4. **Keeps the human in the loop**: the officer escalates, dismisses or requests information, and every decision gets a SHA-256 receipt chained to the previous one (tamper-evident audit log).
 5. **What-if and jury input**: re-score live after removing the pre-alert burst, adding micro-amount transfers or shifting amounts, or upload any CSV of transactions.
-6. **Grounded AI copilot**: the officer asks questions in English, Uzbek or Russian ("why is it risky?", "what should I check next?", "draft a request for documents"). An open-weight LLM answers using only a FACTS JSON computed server-side by the scorer, and every number in its answer is checked against those facts. The LLM never produces the score or the decision. Demo: `meta/llama-3.3-70b` through Vercel AI Gateway (OIDC auth, no key in the code). Bank: the same open-weight model served internally (set `ALERTLENS_LLM_URL`); scoring works without it.
+6. **Grounded AI copilot**: the officer asks questions in English, Uzbek or Russian ("why is it risky?", "what should I check next?", "draft a request for documents"). An open-weight LLM answers using only a FACTS JSON computed server-side by the scorer, and every number in its answer is checked against those facts. The LLM never produces the score or the decision. Demo: `meta/llama-3.3-70b` (fallback `alibaba/qwen-3-32b`) through Vercel AI Gateway (OIDC auth, no key in the code). Bank: an open-weight model served on one 24 GB GPU inside the perimeter, e.g. Qwen3-32B in 4-bit via vLLM (set `ALERTLENS_LLM_URL`); ranking, reasons, memo and audit work without it.
 
 ## Results (held-out test set: 2,800 competition alerts, never used for training)
 
@@ -27,6 +27,9 @@ Transaction monitoring produces far more alerts than officers can review careful
 | average queue position of a true escalation | 36% of the queue vs 50% in arrival order (−28% waiting) |
 | typology model, recovering the hidden client group (label-free, CV) | AUC 0.927 |
 | scoring time | ≈6 ms per alert on one CPU core, including feature extraction from ~500 transactions |
+| AI copilot (demo) | 1.3–2.8 s per answer; $0.00068–0.00079 per question (≈9 UZS), Vercel AI Gateway `usage.cost`, measured 10 Oct 2026 |
+
+**Known failure cases (measured on the same test set):** clients with short histories (≤ 309 transactions) AUC 0.598; the rare clients with conflicting typology markers (62 alerts) AUC 0.325; inside one marker group the ranking is weak (AUC 0.557 for N, 0.566 for S), because most of the signal is the group itself. Labels are noisy: even perfect knowledge of the client group gives AUC ≈ 0.66, so AlertLens prioritises and never auto-closes. The copilot can phrase things badly; every number it writes is checked against the facts and flagged if unverified.
 
 The full numbers are in `artifacts/metrics.json` and on the **Model card** page of the app.
 
@@ -44,7 +47,7 @@ alert + 180-day transactions
 
 **Our edge: the hidden typology.** Amount distributions have narrow "floor bands" whose position differs between two hidden client groups, S (≈30% escalated) and N (≈10%). The bands never co-occur in one client, so they act as label-free markers. A second model learns the typology from the bulk behaviour of marker clients and extends it to all clients. We found this structure in the elimination round; it does not come out of general-purpose LLM tooling.
 
-**Inside the bank's perimeter.** The scoring service needs only numpy: no external API, no GPU, no internet. Training runs offline on the bank's own labelled alert history; only model files are deployed. The public demo runs the same code on Vercel with synthetic alerts.
+**Inside the bank's perimeter.** The scoring service needs only numpy: no external API, no GPU, no internet. The copilot uses an open-weight model on the bank's own GPU, so customer data never leaves the perimeter. Training runs offline on the bank's own labelled alert history; only model files are deployed. The public demo runs the same code on Vercel with synthetic alerts and calls an external LLM API, which the rules allow for the prototype.
 
 ## Repository
 
@@ -82,12 +85,35 @@ curl -X POST localhost:8000/api/score -H 'Content-Type: application/json' -d '{
 ## Deployment
 
 - **Public demo:** Vercel. Static front-end on the CDN and the Python API as serverless functions in region `fra1` (Frankfurt), deployed automatically from this repository on every push to `master`; Vercel keeps the deployment history.
-- **Bank (production design):** the same code in one Docker container (`Dockerfile`) on a server or Kubernetes cluster inside the bank's network. numpy only, no outbound internet, no paid API. Officers sign in through the bank's SSO (Active Directory). The roles are officer, supervisor and auditor, and every action is logged with the user ID in an append-only table. Model files are versioned, and retraining runs offline on the bank's labelled alert history.
+- **Bank (production design):** the same code in one Docker container (`Dockerfile`) on a server or Kubernetes cluster inside the bank's network. Scoring is numpy only; the copilot calls an open-weight model on one internal GPU server. No outbound internet, no paid API. Officers sign in through the bank's SSO (Active Directory). The roles are officer, supervisor and auditor, and every action is logged with the user ID in an append-only table. Model files are versioned, and retraining runs offline on the bank's labelled alert history.
 
 ```bash
 docker build -t alertlens .
 docker run -p 8000:8000 alertlens     # http://<server>:8000
 ```
+
+## Cost model
+
+Every input is editable on the **Budget & ROI** page of the app. Assumptions are marked; replace them with the bank's figures.
+
+**Paid services used by the demo (paid by our team):**
+
+| service | cost |
+|---|---|
+| Vercel hosting (static site + Python functions) | 0 UZS, no hosting charges so far |
+| Vercel AI Gateway, open-weight LLM for the copilot | $0.00068–0.00079 per question, ≈9 UZS (measured 10 Oct 2026; shown live under every answer) |
+
+**3-month pilot inside the bank:**
+
+| item | UZS | basis |
+|---|---|---|
+| team: 3 people × 3 months × 8M | 72,000,000 | assumption |
+| one virtual server (4 vCPU) for scoring, API and audit table | 6,000,000 | assumption |
+| one NVIDIA L4 24 GB GPU for the on-prem copilot | 40,000,000 | ≈$3,000 typical market price (gpupoet, 2026) + 12% VAT, 11,778 UZS/$ (CBU, 6 Oct 2026) |
+| **total** | **118,000,000** | |
+| running cost after the pilot | 4,000,000 / month | assumption: support, monitoring, retraining |
+
+**Return:** 3,000 alerts/month (assumption), full review 20 min (INETCO: 10–30 min), light review of P3 alerts 10 min, 60,000 UZS per officer-hour (assumption). P3 is 50% of alerts and only 9.7% of them were escalated on the test set, so a light review of P3 frees ≈250 officer-hours ≈ 15M UZS per month. Net of running cost ≈ 11M UZS/month: **payback ≈ 10.7 months** (≈ 7.1 months without the copilot GPU). Unit economics: ≈1,300 UZS running cost per alert vs ≈20,000 UZS of officer time for one full review. With half of each day's alerts reviewed the same day, ≈112 more escalations per month are handled the same day.
 
 ## Retrain (requires the competition data, which is not included)
 
@@ -113,11 +139,14 @@ Deterministic: the split uses seed 2026 and LightGBM runs with `deterministic=Tr
 
 | source | use | licence / terms |
 |---|---|---|
-| WIUT Hackathon 2026 elimination-round dataset (20,000 alerts, ≈10M transactions; per the organisers synthetic, transformed and localised, no real customer records) | training and held-out evaluation | competition terms and NDA. Not redistributed; only trained model files and aggregate statistics are published |
-| Synthetic alerts (`synth/generate.py`, `synth/params.json`) | public demo | our own; generated from aggregate statistics (quantiles, covariances, marker rates), no individual records |
+| WIUT Hackathon 2026 elimination-round dataset (20,000 alerts, ≈10M transactions; per the organisers synthetic, transformed and localised, no real customer records) | training and held-out evaluation, continuing our elimination task as the FinTech brief suggests | competition terms and NDA: kept on our own computers only. Not redistributed; only trained model files and aggregate statistics are published |
+| Synthetic alerts (`synth/generate.py`, `synth/params.json`) | public demo | our own. Generation method: per-client draws from aggregate statistics (quantiles, covariances, marker rates) fitted by `synth/fit_params.py`; no individual records |
+| Llama 3.3 70B Instruct (Meta), via Vercel AI Gateway | demo copilot | Llama 3.3 Community License; gateway: Vercel terms, paid per use |
+| Qwen3-32B (Alibaba), via Vercel AI Gateway | demo copilot fallback; candidate on-prem model | Apache-2.0 |
 | numpy | inference | BSD-3-Clause |
 | LightGBM, scikit-learn, pandas, pyarrow | training only | MIT, BSD-3-Clause, BSD-3-Clause, Apache-2.0 |
 | Chart.js (CDN) | charts in the UI | MIT |
+| PwC "From source to surveillance" (90–95% false positives); INETCO, Sept 2026 (10–30 min per alert); yep.uz, May 2026 (CBU internal-control rules); gpupoet (GPU price); CBU (exchange rate) | problem statement and cost model | cited public sources |
 
 No real personal or confidential bank data is used in the demo.
 
@@ -127,6 +156,8 @@ No real personal or confidential bank data is used in the demo.
 - Clients with short histories get weak profiles (typology "unclear").
 - Floor bands depend on the current monitoring rules and data feed. Marker rates and AUC should be monitored monthly and the model retrained after rule changes.
 - The demo audit log lives in the browser; in production it is an append-only table in the bank's database.
+- The on-prem copilot (open-weight model on one L4 GPU) is a design that we have not benchmarked yet; answer quality in Uzbek and speed are measured in month 1 of the pilot. Ranking, reasons, memo and audit do not depend on it.
+- The demo copilot sends only the computed facts for the alert on screen (no raw transactions) to the external API; in the bank no data leaves the perimeter.
 
 ## Licence
 
