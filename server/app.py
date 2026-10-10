@@ -189,7 +189,7 @@ class handler(BaseHTTPRequestHandler):
                 feats = r.pop('features')
                 kv = {k: feats.get(k) for k in ('n_hist', 'n_burst', 'active_days', 'blk_S_n', 'blk_N_n')}
                 m = json.load(open(os.path.join(ROOT, 'artifacts', 'metrics.json')))
-                facts = copilot.build_facts(str(d.get('alert_id', 'alert'))[:60], r, kv, m['bands'], S().pop)
+                facts = copilot.build_facts(str(d.get('alert_id', 'alert'))[:60], r, kv, m['bands'], S().pop, d.get('lang', 'en'))
                 token = (os.getenv('AI_GATEWAY_API_KEY') or os.getenv('VERCEL_OIDC_TOKEN')
                          or self.headers.get('x-vercel-oidc-token'))
                 try:

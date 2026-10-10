@@ -25,7 +25,8 @@ Rules:
 - Answer in {lang}."""
 
 
-def build_facts(alert_id, r, kv, bands, pop):
+def build_facts(alert_id, r, kv, bands, pop, lang='en'):
+    lg = lang if lang in ('en', 'uz', 'ru') else 'en'
     concepts = r['reasons']['concepts']
     tp = r['typology_p']
     return {
@@ -46,8 +47,8 @@ def build_facts(alert_id, r, kv, bands, pop):
         'active_days': int(kv.get('active_days') or 0),
         'transactions_in_last_200_seconds_before_alert': int(kv.get('n_burst') or 0),
         'typical_client_transactions_in_last_200_seconds': (pop.get('n_burst') or [None])[0],
-        'reasons_ranked': [{'factor': c['label']['en'], 'effect': 'raises risk' if c['direction'] == 'up' else 'lowers risk',
-                            'odds_multiplier': round(c['odds_x'], 2), 'evidence': c['evidence']['en']} for c in concepts],
+        'reasons_ranked': [{'factor': c['label'][lg], 'effect': 'raises risk' if c['direction'] == 'up' else 'lowers risk',
+                            'odds_multiplier': round(c['odds_x'], 2), 'evidence': c['evidence'][lg]} for c in concepts],
         'note': 'amounts are a normalised amount index, not currency; SD = standard deviations versus comparable clients',
     }
 

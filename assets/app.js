@@ -289,7 +289,7 @@ async function askAI() {
       body: JSON.stringify({alert_id: CUR.id, transactions: CUR.transactions, question: q, lang})});
     const ver = r.all_numbers_verified ? '<span class="chip N">✓ every number verified against the model\'s facts</span>'
       : `<span class="chip P2">⚠ check these numbers: ${r.unverified_numbers.join(', ')}</span>`;
-    out.innerHTML = `<div class="ai-q">${esc(q)}</div><div class="ai-ans">${esc(r.answer).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').replace(/\n/g, '<br>')}</div>
+    out.innerHTML = `<div class="ai-q">${esc(q)}</div><div class="ai-ans">${esc(r.answer).replace(/^[ \t]*[*\-][ \t]+/gm, '• ').replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').replace(/\n/g, '<br>')}</div>
       <div class="row" style="margin-top:8px">${ver}<span class="chip U">${esc(r.model)} · ${r.latency_ms} ms</span></div>
       <details style="margin-top:8px"><summary>Facts the AI was allowed to use</summary><pre class="facts-json">${esc(JSON.stringify(r.facts, null, 1))}</pre></details>`;
   } catch (e) {
@@ -516,13 +516,13 @@ async function renderROI() {
   <div class="grid g4" style="margin-bottom:16px" id="roi-kpis"></div>
   <div class="grid g23">
     <div class="card"><h3>Bank inputs</h3><p class="hint">Assumptions: replace them with the bank's own figures. Model effects come from the held-out test set.</p>
-      ${f('r-alerts', 'Alerts per month', 3000, 100)}
-      ${f('r-min', 'Minutes per full review', 25, 1)}
-      ${f('r-fast', 'Minutes per light review of P3 alerts', 12, 1, 'Policy option: P3 alerts still get a human look. Set it equal to the full review to switch this saving off.')}
-      ${f('r-rate', 'Loaded officer cost, UZS per hour', 60000, 1000)}
+      ${f('r-alerts', 'Alerts per month', 3000, 100, 'Assumption. Industry: 90–95% of AML alerts are false positives (PwC); 83% were dismissed in the competition data.')}
+      ${f('r-min', 'Minutes per full review', 20, 1, 'Industry range 10–30 minutes per alert (INETCO, 2026); 20 = midpoint.')}
+      ${f('r-fast', 'Minutes per light review of P3 alerts', 10, 1, 'Policy option: P3 alerts still get a human look. Set it equal to the full review to switch this saving off.')}
+      ${f('r-rate', 'Loaded officer cost, UZS per hour', 60000, 1000, 'Assumption (≈10M UZS/month incl. taxes ÷ 168 h). Replace with the bank\'s payroll figure.')}
       ${f('r-capacity', 'Share of each day\'s alerts reviewed the same day, %', 50, 5)}
       <h3 style="margin-top:16px">Pilot (3 months)</h3>
-      ${f('r-team', 'Team: people × months × monthly cost, UZS', 3 * 3 * 12000000, 1000000)}
+      ${f('r-team', 'Team: people × months × monthly cost, UZS', 3 * 3 * 8000000, 1000000, 'Assumption: 3 people × 3 months × 8M UZS.')}
       ${f('r-infra', 'One server inside the bank (4 vCPU), UZS', 6000000, 500000)}
       ${f('r-run', 'Running cost per month after the pilot, UZS', 4000000, 500000)}</div>
     <div class="card"><h3>Results</h3><div id="r-out"></div></div>
